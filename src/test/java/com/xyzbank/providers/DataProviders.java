@@ -16,11 +16,6 @@ public final class DataProviders {
     private DataProviders() {
     }
 
-    @DataProvider(name = "validCustomers")
-    public static Object[][] validCustomers() {
-        return toRows(TestDataReader.readList("valid-customers.json", Customer.class));
-    }
-
     @DataProvider(name = "invalidCustomers")
     public static Object[][] invalidCustomers() {
         List<Customer> customers = TestDataReader.readList("invalid-customers.json", Customer.class);

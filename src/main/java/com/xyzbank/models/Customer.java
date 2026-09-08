@@ -1,7 +1,7 @@
 package com.xyzbank.models;
 
 /**
- * Maps 1:1 to entries in testdata/valid-customers.json and testdata/invalid-customers.json.
+ * Maps 1:1 to entries in testdata/invalid-customers.json.
  * Kept as a plain POJO so Jackson can deserialize fixtures directly and tests can pass a
  * typed object (rather than raw strings) into page objects and Allure step messages.
  */
