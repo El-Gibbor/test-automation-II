@@ -25,7 +25,7 @@ public class ViewTransactionsTest extends BaseTest {
     @Test(description = "Customer can view their transaction history after making a deposit",
             groups = {"customer", "smoke"}
     )
-    @Story("View Transactions")
+    @Story("Viewing Transactions")
     @Severity(SeverityLevel.NORMAL)
     @FlakyEnvironment
     // Confirmed by repeated local runs: the deposit itself always succeeds (correct confirmation
