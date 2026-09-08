@@ -76,24 +76,41 @@ jobs:
           publish_branch: gh-pages
           publish_dir: target/site/allure-maven-plugin
 
+      # Builds the whole Slack payload as one JSON value with jq rather than static YAML, since
+      # the number of "failed test" cards varies per run - Block Kit can't express that
+      # conditionally in a fixed template. Each failed test gets its own colored attachment
+      # (its own left-edge color bar), which is the closest real Slack can get to a card look;
+      # plain Block Kit has no per-block background fill.
       - name: Summarize test run
         if: always()
         id: summary
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          JOB_STATUS: ${{ job.status }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          ACTOR_NAME: ${{ github.actor }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          elapsed=$(( $(date +%s) - ${{ steps.timer.outputs.start }} ))
-          echo "elapsed=$(printf '%dm %ds' $((elapsed / 60)) $((elapsed % 60)))" >> "$GITHUB_OUTPUT"
-          echo "time=$(date -u +'%H:%M UTC')" >> "$GITHUB_OUTPUT"
-          echo "short_sha=$(echo "${{ github.sha }}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+          elapsed_secs=$(( $(date +%s) - ${{ steps.timer.outputs.start }} ))
+          elapsed=$(printf '%dm %ds' $((elapsed_secs / 60)) $((elapsed_secs % 60)))
+          short_sha=$(echo "${{ github.sha }}" | cut -c1-7)
+          report_url="https://${REPO_OWNER}.github.io/${REPO_NAME}/"
+          commit_url="${COMMIT_URL:-$PR_URL}"
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ]; then
             subject="$PR_TITLE"
+            trigger_label="pull request"
           else
             subject=$(printf '%s' "$COMMIT_MESSAGE" | head -1)
+            trigger_label="push"
           fi
-          echo "commit_subject=$subject" >> "$GITHUB_OUTPUT"
 
           if [ -f target/surefire-reports/testng-results.xml ]; then
             xml=$(grep -o '<testng-results[^>]*>' target/surefire-reports/testng-results.xml | head -1)
@@ -110,19 +127,85 @@ jobs:
           else
             total=0; passed=0; failed=0; skipped=0; retried=0; pass_rate="0.0"
           fi
-          echo "total=$total" >> "$GITHUB_OUTPUT"
-          echo "passed=$passed" >> "$GITHUB_OUTPUT"
-          echo "failed=$failed" >> "$GITHUB_OUTPUT"
-          echo "skipped=$skipped" >> "$GITHUB_OUTPUT"
-          echo "retried=$retried" >> "$GITHUB_OUTPUT"
-          echo "pass_rate=$pass_rate" >> "$GITHUB_OUTPUT"
+
+          if [ "$JOB_STATUS" = "success" ]; then
+            status_color="#2eb67d"
+            header_text="✅ CI Pipeline Passed"
+          else
+            status_color="#e01e5a"
+            if [ "$total" -eq 0 ]; then
+              header_text="🔴 CI Pipeline Failed, build error before tests ran"
+            else
+              header_text="🔴 CI Pipeline Failed, ${failed} test(s) need attention"
+            fi
+          fi
 
           if [ -f test-output.log ]; then
-            failed_tests=$(grep -oP '^\[ERROR\]   \K.*' test-output.log | head -5 | sed 's/$/\\n/' | tr -d '\n')
+            failed_json=$(grep -oP '^\[ERROR\]   \K.*' test-output.log | head -5 | jq -R -s '
+              split("\n") | map(select(length > 0)) | map(capture("^(?<title>\\S+)\\s+(?<detail>.*)$"))
+            ')
           else
-            failed_tests=""
+            failed_json="[]"
           fi
-          echo "failed_tests=$failed_tests" >> "$GITHUB_OUTPUT"
+
+          payload=$(jq -n -c \
+            --arg status_color "$status_color" --arg header_text "$header_text" \
+            --arg repo_name "$REPO_NAME" --arg branch "$BRANCH_NAME" \
+            --arg short_sha "$short_sha" --arg subject "$subject" \
+            --arg actor "$ACTOR_NAME" --arg trigger_label "$trigger_label" \
+            --arg passed "$passed" --arg failed "$failed" --arg skipped "$skipped" --arg retried "$retried" \
+            --arg total "$total" --arg pass_rate "$pass_rate" --arg elapsed "$elapsed" \
+            --arg report_url "$report_url" --arg run_url "$RUN_URL" --arg commit_url "$commit_url" \
+            --arg jira_url "https://amali-tech.atlassian.net/secure/CreateIssue.jspa" \
+            --arg run_number "$RUN_NUMBER" \
+            --argjson failed_tests "$failed_json" \
+            '
+            def mrkdwn: {type: "mrkdwn", text: .};
+            def field($label; $value): ("*" + $label + "*\n" + $value) | mrkdwn;
+            {
+              attachments: (
+                [{
+                  color: $status_color,
+                  blocks: [
+                    {type: "header", text: {type: "plain_text", text: $header_text, emoji: true}},
+                    {type: "context", elements: [("Selenium WebDriver + TestNG regression suite" | mrkdwn)]},
+                    {type: "divider"},
+                    {type: "section", fields: [field("Repository"; "`" + $repo_name + "`"), field("Branch"; "`" + $branch + "`")]},
+                    {type: "divider"},
+                    {type: "section", fields: [field("Commit"; "`" + $short_sha + "` " + $subject), field("Triggered by"; $actor + ", " + $trigger_label)]},
+                    {type: "divider"},
+                    {type: "section", fields: [
+                      field("🟢 Passed"; $passed), field("🔴 Failed"; $failed),
+                      field("⚪ Skipped"; $skipped), field("🟡 Retried"; $retried)
+                    ]},
+                    {type: "context", elements: [($total + " tests total, " + $pass_rate + "% pass rate, duration " + $elapsed | mrkdwn)]}
+                  ]
+                }]
+                + [$failed_tests[] | {
+                    color: "#e01e5a",
+                    blocks: [{type: "section", text: (("❌ *" + .title + "*\n" + .detail) | mrkdwn)}]
+                  }]
+                + (if ($failed_tests | length) > 0 then
+                    [{color: "#ecb22e", blocks: [{type: "section", text: ("⚠️ *QA action*\nReview the failing tests before approving this change." | mrkdwn)}]}]
+                  else [] end)
+                + [{
+                    color: $status_color,
+                    blocks: [
+                      {type: "actions", elements: [
+                        {type: "button", text: {type: "plain_text", text: "View Report", emoji: true}, style: "primary", url: $report_url},
+                        {type: "button", text: {type: "plain_text", text: "View Run", emoji: true}, url: $run_url},
+                        {type: "button", text: {type: "plain_text", text: "View Commit", emoji: true}, url: $commit_url},
+                        {type: "button", text: {type: "plain_text", text: "Create Jira Issue", emoji: true}, url: $jira_url}
+                      ]},
+                      {type: "divider"},
+                      {type: "context", elements: [("GitHub Actions · Build " + $run_number + " · Chrome headless · Java 17" | mrkdwn)]}
+                    ]
+                  }]
+              )
+            }
+            '
+          )
+          echo "payload=$payload" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack of build status
         if: always()
@@ -130,70 +213,4 @@ jobs:
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
-          payload: |
-            attachments:
-              - color: "${{ job.status == 'success' && '#2eb67d' || '#e01e5a' }}"
-                blocks:
-                  - type: "header"
-                    text:
-                      type: "plain_text"
-                      text: "${{ job.status == 'success' && '✅ CI Pipeline Passed' || (steps.summary.outputs.total == '0' && '🔴 CI Pipeline Failed, build error before tests ran' || format('🔴 CI Pipeline Failed, {0} test(s) failing', steps.summary.outputs.failed)) }}"
-                      emoji: true
-                  - type: "context"
-                    elements:
-                      - type: "mrkdwn"
-                        text: "Selenium WebDriver + TestNG regression suite"
-                  - type: "divider"
-                  - type: "section"
-                    fields:
-                      - type: "mrkdwn"
-                        text: "*Repository*\n`${{ github.event.repository.name }}`"
-                      - type: "mrkdwn"
-                        text: "*Branch*\n`${{ github.ref_name }}`"
-                      - type: "mrkdwn"
-                        text: "*Commit*\n`${{ steps.summary.outputs.short_sha }}` ${{ steps.summary.outputs.commit_subject }}"
-                      - type: "mrkdwn"
-                        text: "*Triggered by*\n${{ github.actor }}, ${{ github.event_name == 'push' && 'push' || 'pull request' }}"
-                  - type: "divider"
-                  - type: "section"
-                    text:
-                      type: "mrkdwn"
-                      text: "*Test Results*\n✅ Passed: ${{ steps.summary.outputs.passed }}\n❌ Failed: ${{ steps.summary.outputs.failed }}\n⏭️ Skipped: ${{ steps.summary.outputs.skipped }}\n🔁 Retried: ${{ steps.summary.outputs.retried }}\n📊 Total: ${{ steps.summary.outputs.total }}\n⏱️ Duration: ${{ steps.summary.outputs.elapsed }}\n*Pass rate:* ${{ steps.summary.outputs.pass_rate }}%"
-                  - type: "divider"
-                  - type: "section"
-                    text:
-                      type: "mrkdwn"
-                      text: "${{ steps.summary.outputs.failed == '0' && (steps.summary.outputs.total == '0' && '⚠️ No test report was generated, check the run logs.' || '✅ No failures on this run.') || format('*Failed tests*\n{0}', steps.summary.outputs.failed_tests) }}"
-                  - type: "divider"
-                  - type: "actions"
-                    elements:
-                      - type: "button"
-                        text:
-                          type: "plain_text"
-                          text: "🧪 View Report"
-                          emoji: true
-                        style: "primary"
-                        url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
-                      - type: "button"
-                        text:
-                          type: "plain_text"
-                          text: "🏃 View Run"
-                          emoji: true
-                        url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                      - type: "button"
-                        text:
-                          type: "plain_text"
-                          text: "🌿 View Commit"
-                          emoji: true
-                        url: "${{ github.event.head_commit.url || github.event.pull_request.html_url }}"
-                      - type: "button"
-                        text:
-                          type: "plain_text"
-                          text: "🐛 Create Jira Issue"
-                          emoji: true
-                        url: "https://amali-tech.atlassian.net/secure/CreateIssue.jspa"
-                  - type: "divider"
-                  - type: "context"
-                    elements:
-                      - type: "mrkdwn"
-                        text: "GitHub Actions · Build ${{ github.run_number }} · Chrome headless · Java 17"
+          payload: ${{ steps.summary.outputs.payload }}
