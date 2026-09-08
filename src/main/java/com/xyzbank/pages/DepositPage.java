@@ -2,6 +2,7 @@ package com.xyzbank.pages;
 
 import io.qameta.allure.Step;
 import org.openqa.selenium.By;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 
@@ -24,9 +25,25 @@ public class DepositPage extends BasePage {
 
     @Step("Deposit amount: {amount}")
     public String deposit(double amount) {
+        return deposit(String.valueOf(amount));
+    }
+
+    /**
+     * Overload for fixtures that need to type a non-numeric value (e.g. "abc"), which a double
+     * can't represent. Waits for the result message to render before reading it, so a caller
+     * never races Angular's digest cycle (e.g. checking the transaction list right after this
+     * returns). If native browser validation blocks the submission outright (a decimal amount
+     * with no matching `step`, for instance), no message ever appears and this returns "".
+     */
+    @Step("Deposit amount: {rawAmount}")
+    public String deposit(String rawAmount) {
         wait.until(ExpectedConditions.visibilityOfElementLocated(FORM));
-        type(AMOUNT_INPUT, String.valueOf(amount));
+        type(AMOUNT_INPUT, rawAmount);
         click(SUBMIT_BUTTON);
-        return isDisplayed(RESULT_MESSAGE) ? getText(RESULT_MESSAGE) : "";
+        try {
+            return wait.until(ExpectedConditions.visibilityOfElementLocated(RESULT_MESSAGE)).getText();
+        } catch (TimeoutException noMessageShown) {
+            return "";
+        }
     }
 }
