@@ -133,9 +133,9 @@ jobs:
           else
             status_color="#e01e5a"
             if [ "$total" -eq 0 ]; then
-              header_text="🔴 CI Pipeline Failed, build error before tests ran"
+              header_text="🔴 CI Pipeline Failed"
             else
-              header_text="🔴 CI Pipeline Failed, ${failed} test(s) need attention"
+              header_text="🔴 CI Pipeline Failed"
             fi
           fi
 
@@ -196,28 +196,21 @@ jobs:
                   color: $status_color,
                   blocks: [
                     {type: "header", text: {type: "plain_text", text: $header_text, emoji: true}},
-                    {type: "context", elements: [("Selenium WebDriver + TestNG regression suite" | mrkdwn)]},
-                    {type: "divider"},
                     {type: "section", fields: [field("Repository"; "`" + $repo_name + "`"), field("Branch"; "`" + $branch + "`")]},
-                    {type: "divider"},
                     {type: "section", fields: [field("Commit"; "`" + $short_sha + "` " + $subject), field("Triggered by"; $actor + ", " + $trigger_label)]},
                     {type: "divider"},
-                    {type: "section", fields: [
-                      field("Passed"; $passed), field("Failed"; $failed),
-                      field("Skipped"; $skipped), field("Retried"; $retried)
-                    ]},
+                    {type: "section", text: (("*Results*\n🟢 " + $passed + " passed   🔴 " + $failed + " failed   ⚪ " + $skipped + " skipped   🟡 " + $retried + " retried") | mrkdwn)},
                     {type: "context", elements: [($total + " tests total, " + $pass_rate + "% pass rate, duration " + $elapsed | mrkdwn)]}
                   ]
                 }]
                 + (if ($failed_tests | length) > 0 then
-                    [{color: "#e01e5a", blocks: [{type: "section", text: ("*Failed tests*" | mrkdwn)}]}]
-                  else [] end)
-                + [$failed_tests[] | {
-                    color: "#e01e5a",
-                    blocks: [{type: "section", text: (("*" + .title + "*") | mrkdwn)}]
-                  }]
-                + (if $overflow_note != "" then
-                    [{color: "#e01e5a", blocks: [{type: "context", elements: [($overflow_note | mrkdwn)]}]}]
+                    [{
+                      color: "#e01e5a",
+                      blocks: [{
+                        type: "section",
+                        text: (("*Failed tests*\n" + ([$failed_tests[] | "• " + (if .detail != "" then .detail else .title end)] | join("\n")) + (if $overflow_note != "" then "\n_" + $overflow_note + "_" else "" end)) | mrkdwn)
+                      }]
+                    }]
                   else [] end)
                 + [{
                     color: $status_color,
