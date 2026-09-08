@@ -1,0 +1,8 @@
+[
+  {
+    "firstName": "Alice",
+    "lastName": "Reyes",
+    "postalCode": "10245",
+    "description": "Deterministic customer used for simple, single-case happy-path assertions"
+  }
+]

@@ -1,0 +1,6 @@
+[
+  { "amount": 50,        "expectedValid": true,  "description": "Valid withdrawal within available balance" },
+  { "amount": 0,         "expectedValid": false, "description": "Zero amount must be rejected" },
+  { "amount": -50,       "expectedValid": false, "description": "Negative amount must be rejected" },
+  { "amount": 999999999, "expectedValid": false, "description": "Withdrawal exceeding balance must be rejected" }
+]

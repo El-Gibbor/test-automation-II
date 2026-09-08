@@ -1,0 +1,5 @@
+[
+  { "amount": 500,  "expectedValid": true,  "description": "Valid positive deposit amount" },
+  { "amount": 0,    "expectedValid": false, "description": "Zero amount must be rejected" },
+  { "amount": -100, "expectedValid": false, "description": "Negative amount must be rejected" }
+]
