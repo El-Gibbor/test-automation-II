@@ -26,7 +26,7 @@ public class DeleteAccountTest extends BaseTest {
 
     @Test(description = "Deleting a customer removes them from the Customers list and revokes account access",
             groups = {"manager", "customer", "smoke"})
-    @Story("Delete Account")
+    @Story("Deleting Accounts")
     @Severity(SeverityLevel.CRITICAL)
     @Description("After a manager deletes a customer, the customer no longer appears in the manager's list "
             + "and can no longer log in to access the deleted account.")
