@@ -28,8 +28,10 @@ jobs:
         run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       # ubuntu-latest ships Google Chrome pre-installed; WebDriverManager matches the driver to it.
+      # Piped through tee so "Summarize test run" can pull failure detail out of the same output;
+      # GitHub Actions' default bash runs with pipefail, so a test failure still fails this step.
       - name: Run Selenium test suite (headless)
-        run: mvn -B test -Dheadless=true
+        run: mvn -B test -Dheadless=true 2>&1 | tee test-output.log
 
       # Always upload raw results as a build artifact - the reliable path for grading/review,
       # independent of whether GitHub Pages is enabled on this repo.
@@ -77,19 +79,50 @@ jobs:
       - name: Summarize test run
         if: always()
         id: summary
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           elapsed=$(( $(date +%s) - ${{ steps.timer.outputs.start }} ))
           echo "elapsed=$(printf '%dm %ds' $((elapsed / 60)) $((elapsed % 60)))" >> "$GITHUB_OUTPUT"
           echo "time=$(date -u +'%H:%M UTC')" >> "$GITHUB_OUTPUT"
           echo "short_sha=$(echo "${{ github.sha }}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
-          if compgen -G "target/surefire-reports/*.txt" > /dev/null; then
-            line=$(cat target/surefire-reports/*.txt | grep "Tests run" | tail -1)
-            failed=$(echo "$line" | grep -oP 'Failures: \K[0-9]+')
-            errors=$(echo "$line" | grep -oP 'Errors: \K[0-9]+')
-            echo "failed_summary=$((failed + errors)) tests failed" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            subject="$PR_TITLE"
           else
-            echo "failed_summary=no test report found" >> "$GITHUB_OUTPUT"
+            subject=$(printf '%s' "$COMMIT_MESSAGE" | head -1)
           fi
+          echo "commit_subject=$subject" >> "$GITHUB_OUTPUT"
+
+          if [ -f target/surefire-reports/testng-results.xml ]; then
+            xml=$(grep -o '<testng-results[^>]*>' target/surefire-reports/testng-results.xml | head -1)
+            total=$(echo "$xml" | grep -oP 'total="\K[0-9]+' || echo 0)
+            passed=$(echo "$xml" | grep -oP 'passed="\K[0-9]+' || echo 0)
+            failed=$(echo "$xml" | grep -oP 'failed="\K[0-9]+' || echo 0)
+            skipped=$(echo "$xml" | grep -oP 'skipped="\K[0-9]+' || echo 0)
+            retried=$(echo "$xml" | grep -oP 'retried="\K[0-9]+' || echo 0)
+            if [ "$total" -gt 0 ]; then
+              pass_rate=$(awk "BEGIN { printf \"%.1f\", ($passed/$total)*100 }")
+            else
+              pass_rate="0.0"
+            fi
+          else
+            total=0; passed=0; failed=0; skipped=0; retried=0; pass_rate="0.0"
+          fi
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+          echo "passed=$passed" >> "$GITHUB_OUTPUT"
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          echo "skipped=$skipped" >> "$GITHUB_OUTPUT"
+          echo "retried=$retried" >> "$GITHUB_OUTPUT"
+          echo "pass_rate=$pass_rate" >> "$GITHUB_OUTPUT"
+
+          if [ -f test-output.log ]; then
+            failed_tests=$(grep -oP '^\[ERROR\]   \K.*' test-output.log | head -5 | sed 's/$/\\n/' | tr -d '\n')
+          else
+            failed_tests=""
+          fi
+          echo "failed_tests=$failed_tests" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack of build status
         if: always()
@@ -104,36 +137,63 @@ jobs:
                   - type: "header"
                     text:
                       type: "plain_text"
-                      text: "${{ job.status == 'success' && 'Build success' || 'Build failure' }}"
-                  - type: "section"
-                    fields:
-                      - type: "mrkdwn"
-                        text: "*Repo*\n${{ github.event.repository.name }}"
-                      - type: "mrkdwn"
-                        text: "*Branch*\n${{ github.ref_name }}"
-                      - type: "mrkdwn"
-                        text: "*Trigger*\n${{ github.event_name == 'push' && format('Push by @{0}', github.actor) || format('PR by @{0}', github.actor) }}"
-                      - type: "mrkdwn"
-                        text: "*Time*\n${{ steps.summary.outputs.time }}"
-                  - type: "divider"
+                      text: "${{ job.status == 'success' && '✅ CI Pipeline Passed' || (steps.summary.outputs.total == '0' && '🔴 CI Pipeline Failed, build error before tests ran' || format('🔴 CI Pipeline Failed, {0} test(s) failing', steps.summary.outputs.failed)) }}"
+                      emoji: true
                   - type: "context"
                     elements:
                       - type: "mrkdwn"
-                        text: "Commit ${{ steps.summary.outputs.short_sha }} · ${{ steps.summary.outputs.elapsed }} · ${{ steps.summary.outputs.failed_summary }}"
+                        text: "Selenium WebDriver + TestNG regression suite"
+                  - type: "divider"
+                  - type: "section"
+                    fields:
+                      - type: "mrkdwn"
+                        text: "*Repository*\n`${{ github.event.repository.name }}`"
+                      - type: "mrkdwn"
+                        text: "*Branch*\n`${{ github.ref_name }}`"
+                      - type: "mrkdwn"
+                        text: "*Commit*\n`${{ steps.summary.outputs.short_sha }}` ${{ steps.summary.outputs.commit_subject }}"
+                      - type: "mrkdwn"
+                        text: "*Triggered by*\n${{ github.actor }}, ${{ github.event_name == 'push' && 'push' || 'pull request' }}"
+                  - type: "divider"
+                  - type: "section"
+                    text:
+                      type: "mrkdwn"
+                      text: "*Test Results*\n✅ Passed: ${{ steps.summary.outputs.passed }}\n❌ Failed: ${{ steps.summary.outputs.failed }}\n⏭️ Skipped: ${{ steps.summary.outputs.skipped }}\n🔁 Retried: ${{ steps.summary.outputs.retried }}\n📊 Total: ${{ steps.summary.outputs.total }}\n⏱️ Duration: ${{ steps.summary.outputs.elapsed }}\n*Pass rate:* ${{ steps.summary.outputs.pass_rate }}%"
+                  - type: "divider"
+                  - type: "section"
+                    text:
+                      type: "mrkdwn"
+                      text: "${{ steps.summary.outputs.failed == '0' && (steps.summary.outputs.total == '0' && '⚠️ No test report was generated, check the run logs.' || '✅ No failures on this run.') || format('*Failed tests*\n{0}', steps.summary.outputs.failed_tests) }}"
+                  - type: "divider"
                   - type: "actions"
                     elements:
                       - type: "button"
                         text:
                           type: "plain_text"
-                          text: "View report"
+                          text: "🧪 View Report"
+                          emoji: true
+                        style: "primary"
                         url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
                       - type: "button"
                         text:
                           type: "plain_text"
-                          text: "View run"
+                          text: "🏃 View Run"
+                          emoji: true
                         url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                       - type: "button"
                         text:
                           type: "plain_text"
-                          text: "View commit"
+                          text: "🌿 View Commit"
+                          emoji: true
                         url: "${{ github.event.head_commit.url || github.event.pull_request.html_url }}"
+                      - type: "button"
+                        text:
+                          type: "plain_text"
+                          text: "🐛 Create Jira Issue"
+                          emoji: true
+                        url: "https://amali-tech.atlassian.net/secure/CreateIssue.jspa"
+                  - type: "divider"
+                  - type: "context"
+                    elements:
+                      - type: "mrkdwn"
+                        text: "GitHub Actions · Build ${{ github.run_number }} · Chrome headless · Java 17"
