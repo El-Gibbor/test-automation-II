@@ -23,11 +23,16 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Record start time
+        id: timer
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       # ubuntu-latest ships Google Chrome pre-installed; WebDriverManager matches the driver to it.
       - name: Run Selenium test suite (headless)
         run: mvn -B test -Dheadless=true
 
-      # Always upload raw results as a build artifact
+      # Always upload raw results as a build artifact - the reliable path for grading/review,
+      # independent of whether GitHub Pages is enabled on this repo.
       - name: Upload Allure results artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -36,7 +41,9 @@ jobs:
           path: target/allure-results
           if-no-files-found: warn
 
-      - name: Load previous Allure history (for trend graphs across runs)
+      # Pulls forward the previous report's trend data so the new report's history/duration
+      # graphs build up across builds instead of resetting to a single point every run.
+      - name: Fetch previous report history
         if: always()
         uses: actions/checkout@v4
         continue-on-error: true
@@ -44,20 +51,89 @@ jobs:
           ref: gh-pages
           path: gh-pages
 
-      - name: Build Allure HTML report
+      - name: Seed history into Allure results
         if: always()
-        uses: simple-elf/allure-report-action@v1.9
-        with:
-          allure_results: target/allure-results
-          allure_history: allure-history
-          gh_pages: gh-pages
-          keep_reports: 20
+        run: |
+          mkdir -p target/allure-results/history
+          if [ -d gh-pages/history ]; then
+            cp -r gh-pages/history/. target/allure-results/history/
+          fi
 
-      - name: Publish report to GitHub Pages
+      # Uses the allure-maven plugin already declared in pom.xml - a plain Maven goal, no
+      # third-party Docker action required (that's what broke the previous report step).
+      - name: Generate Allure report
+        if: always()
+        run: mvn -B allure:report
+
+      - name: Deploy report to GitHub Pages
         if: always()
         uses: peaceiris/actions-gh-pages@v4
         continue-on-error: true
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
-          publish_dir: allure-history
+          publish_dir: target/site/allure-maven-plugin
+
+      - name: Summarize test run
+        if: always()
+        id: summary
+        run: |
+          elapsed=$(( $(date +%s) - ${{ steps.timer.outputs.start }} ))
+          echo "elapsed=$(printf '%dm %ds' $((elapsed / 60)) $((elapsed % 60)))" >> "$GITHUB_OUTPUT"
+          echo "time=$(date -u +'%H:%M UTC')" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$(echo "${{ github.sha }}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+          if compgen -G "target/surefire-reports/*.txt" > /dev/null; then
+            line=$(cat target/surefire-reports/*.txt | grep "Tests run" | tail -1)
+            failed=$(echo "$line" | grep -oP 'Failures: \K[0-9]+')
+            errors=$(echo "$line" | grep -oP 'Errors: \K[0-9]+')
+            echo "failed_summary=$((failed + errors)) tests failed" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed_summary=no test report found" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack of build status
+        if: always()
+        uses: slackapi/slack-github-action@v4
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            attachments:
+              - color: "${{ job.status == 'success' && '#2eb67d' || '#e01e5a' }}"
+                blocks:
+                  - type: "header"
+                    text:
+                      type: "plain_text"
+                      text: "${{ job.status == 'success' && 'Build success' || 'Build failure' }}"
+                  - type: "section"
+                    fields:
+                      - type: "mrkdwn"
+                        text: "*Repo*\n${{ github.event.repository.name }}"
+                      - type: "mrkdwn"
+                        text: "*Branch*\n${{ github.ref_name }}"
+                      - type: "mrkdwn"
+                        text: "*Trigger*\n${{ github.event_name == 'push' && format('Push by @{0}', github.actor) || format('PR by @{0}', github.actor) }}"
+                      - type: "mrkdwn"
+                        text: "*Time*\n${{ steps.summary.outputs.time }}"
+                  - type: "divider"
+                  - type: "context"
+                    elements:
+                      - type: "mrkdwn"
+                        text: "Commit ${{ steps.summary.outputs.short_sha }} · ${{ steps.summary.outputs.elapsed }} · ${{ steps.summary.outputs.failed_summary }}"
+                  - type: "actions"
+                    elements:
+                      - type: "button"
+                        text:
+                          type: "plain_text"
+                          text: "View report"
+                        url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+                      - type: "button"
+                        text:
+                          type: "plain_text"
+                          text: "View run"
+                        url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                      - type: "button"
+                        text:
+                          type: "plain_text"
+                          text: "View commit"
+                        url: "${{ github.event.head_commit.url || github.event.pull_request.html_url }}"
