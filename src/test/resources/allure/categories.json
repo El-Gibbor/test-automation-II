@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Application defects",
+    "matchedStatuses": ["failed"],
+    "messageRegex": ".*(AssertionError).*"
+  },
+  {
+    "name": "Locator / UI changes",
+    "matchedStatuses": ["broken"],
+    "traceRegex": ".*(NoSuchElementException|StaleElementReferenceException|ElementClickInterceptedException|TimeoutException).*"
+  },
+  {
+    "name": "Environment / infrastructure issues",
+    "matchedStatuses": ["broken"],
+    "traceRegex": ".*(WebDriverException|SessionNotCreatedException|UnreachableBrowserException).*"
+  },
+  {
+    "name": "Test defects",
+    "matchedStatuses": ["broken"],
+    "traceRegex": ".*(NullPointerException|IllegalArgumentException).*"
+  }
+]
