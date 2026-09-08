@@ -1,22 +1,28 @@
 package com.xyzbank.tests.customer;
 
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 import com.xyzbank.base.BaseTest;
+import com.xyzbank.jira.JiraLinks;
 import com.xyzbank.models.TransactionAmount;
 import com.xyzbank.pages.AccountPage;
 import com.xyzbank.providers.DataProviders;
+
 import io.qameta.allure.Description;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
+import io.qameta.allure.Link;
 import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
 import io.qameta.allure.Step;
 import io.qameta.allure.Story;
-import org.testng.Assert;
-import org.testng.annotations.Test;
 
 /** User Story 2 - Withdrawing Money acceptance criteria. */
 @Epic("XYZ Bank")
 @Feature("Customer - Transactions")
+@Link(name = "User Story 2", url = JiraLinks.USER_STORY_2)
+@Link(name = "Xray Test Set", url = JiraLinks.CUSTOMER_TEST_SET)
 public class WithdrawTest extends BaseTest {
 
     private static final double SEED_BALANCE = 1000;
@@ -32,7 +38,7 @@ public class WithdrawTest extends BaseTest {
         seedBalance(accountPage);
         double balanceBefore = new AccountPage(driver).getBalance();
 
-        String message = new AccountPage(driver).goToWithdraw().withdraw(data.getAmount());
+        String message = new AccountPage(driver).goToWithdraw().withdraw(data.inputValue());
         double balanceAfter = new AccountPage(driver).getBalance();
 
         if (data.isExpectedValid()) {
