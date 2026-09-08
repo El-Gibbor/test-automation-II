@@ -1,0 +1,148 @@
+<html><head><style type="text/css">@charset "UTF-8";[ng\:cloak],[ng-cloak],[data-ng-cloak],[x-ng-cloak],.ng-cloak,.x-ng-cloak,.ng-hide:not(.ng-hide-animate){display:none !important;}ng\:form{display:block;}.ng-animate-shim{visibility:hidden;}.ng-anchor{position:absolute;}</style>
+
+	<title>XYZ Bank</title>
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+</head>
+
+<body ng-app="BankApp" ng-controller="bodyCtrl" style="background:#e8e8e8;" class="ng-scope">
+	<!-- uiView:  --><div ui-view="" class="ng-scope"><div class="container-fluid ng-scope">
+	<div class="box mainhdr">
+		<button class="btn home" ng-click="home()">Home</button>
+		<strong class="mainHeading">XYZ Bank</strong>
+		<button ng-show="logout" class="btn logout ng-hide" ng-click="byebye()">Logout</button>
+		
+	</div>
+	<!-- uiView:  --><div ui-view="" class="ng-scope"><div class="border box padT20 ng-scope">
+	<div class="center">
+		<button ng-class="btnClass1" class="btn btn-lg tab" ng-click="addCust()">Add Customer
+		<b ng-show="btnClass1 === 'btn-primary'" id="notch" class="notch ng-hide"></b></button>
+		<button ng-class="btnClass2" class="btn btn-lg tab" ng-click="openAccount()">Open Account
+		<b ng-show="btnClass2 === 'btn-primary'" id="notch" class="notch ng-hide"></b></button>
+		<button ng-class="btnClass3" class="btn btn-lg tab btn-primary" ng-click="showCust()">Customers
+		<b ng-show="btnClass3 === 'btn-primary'" id="notch" class="notch"></b></button>
+	</div>
+	<!-- uiView:  --><div class="ng-scope" ui-view=""><div class="marTop ng-scope" style="max-height: 100%;overflow: scroll;">
+
+	  <form class="ng-pristine ng-valid">
+	    <div class="form-group">
+	      <div class="input-group">
+	        <div class="input-group-addon"><i class="fa fa-search"></i></div>
+	        <input type="text" class="form-control ng-pristine ng-untouched ng-valid" placeholder="Search Customer" ng-model="searchCustomer">
+	      </div>      
+	    </div>
+	  </form>
+
+<div style="height:250px;">
+	<table class="table table-bordered table-striped">
+    
+    <thead>
+      <tr>
+        <td>
+          <a href="#" ng-click="sortType = 'fName'; sortReverse = !sortReverse">
+            First Name
+            <span ng-show="sortType == 'fName' &amp;&amp; !sortReverse" class="fa fa-caret-down ng-hide"></span>
+            <span ng-show="sortType == 'fName' &amp;&amp; sortReverse" class="fa fa-caret-up ng-hide"></span>
+          </a>
+        </td>
+        <td>
+          <a href="#" ng-click="sortType = 'lName'; sortReverse = !sortReverse">
+          	Last Name
+            <span ng-show="sortType == 'lName' &amp;&amp; !sortReverse" class="fa fa-caret-down ng-hide"></span>
+            <span ng-show="sortType == 'lName' &amp;&amp; sortReverse" class="fa fa-caret-up ng-hide"></span>
+          </a>
+        </td>
+        <td>
+          <a href="#" ng-click="sortType = 'postCd'; sortReverse = !sortReverse">
+          	Post Code
+            <span ng-show="sortType == 'postCd' &amp;&amp; !sortReverse" class="fa fa-caret-down ng-hide"></span>
+            <span ng-show="sortType == 'postCd' &amp;&amp; sortReverse" class="fa fa-caret-up ng-hide"></span>
+          </a>
+        </td>
+        <td>
+          Account Number
+        </td>
+        <td>
+          Delete Customer
+        </td>
+
+      </tr>
+    </thead>
+    
+    <tbody>
+      <!-- ngRepeat: cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer --><tr ng-repeat="cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer" class="ng-scope">
+        <td class="ng-binding">Hermoine</td>
+        <td class="ng-binding">Granger</td>
+        <td class="ng-binding">E859AB</td>
+        <td><!-- ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1001 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1002 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1003 </span><!-- end ngRepeat: account in cust.accountNo --></td>
+        <td><button ng-click="deleteCust(cust)">Delete</button></td>
+      </tr><!-- end ngRepeat: cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer --><tr ng-repeat="cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer" class="ng-scope">
+        <td class="ng-binding">Harry</td>
+        <td class="ng-binding">Potter</td>
+        <td class="ng-binding">E725JB</td>
+        <td><!-- ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1004 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1005 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1006 </span><!-- end ngRepeat: account in cust.accountNo --></td>
+        <td><button ng-click="deleteCust(cust)">Delete</button></td>
+      </tr><!-- end ngRepeat: cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer --><tr ng-repeat="cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer" class="ng-scope">
+        <td class="ng-binding">Ron</td>
+        <td class="ng-binding">Weasly</td>
+        <td class="ng-binding">E55555</td>
+        <td><!-- ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1007 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1008 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1009 </span><!-- end ngRepeat: account in cust.accountNo --></td>
+        <td><button ng-click="deleteCust(cust)">Delete</button></td>
+      </tr><!-- end ngRepeat: cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer --><tr ng-repeat="cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer" class="ng-scope">
+        <td class="ng-binding">Albus</td>
+        <td class="ng-binding">Dumbledore</td>
+        <td class="ng-binding">E55656</td>
+        <td><!-- ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1010 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1011 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1012 </span><!-- end ngRepeat: account in cust.accountNo --></td>
+        <td><button ng-click="deleteCust(cust)">Delete</button></td>
+      </tr><!-- end ngRepeat: cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer --><tr ng-repeat="cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer" class="ng-scope">
+        <td class="ng-binding">Neville</td>
+        <td class="ng-binding">Longbottom</td>
+        <td class="ng-binding">E89898</td>
+        <td><!-- ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1013 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1014 </span><!-- end ngRepeat: account in cust.accountNo --><span ng-repeat="account in cust.accountNo" class="ng-binding ng-scope">1015 </span><!-- end ngRepeat: account in cust.accountNo --></td>
+        <td><button ng-click="deleteCust(cust)">Delete</button></td>
+      </tr><!-- end ngRepeat: cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer --><tr ng-repeat="cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer" class="ng-scope">
+        <td class="ng-binding">Jane</td>
+        <td class="ng-binding">D0e!</td>
+        <td class="ng-binding">56789</td>
+        <td><!-- ngRepeat: account in cust.accountNo --></td>
+        <td><button ng-click="deleteCust(cust)">Delete</button></td>
+      </tr><!-- end ngRepeat: cust in Customers | orderBy:sortType:sortReverse | filter:searchCustomer -->
+    </tbody>
+    
+  </table>
+</div>
+</div></div>
+
+</div></div>
+
+</div></div>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.7/angular.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.15/angular-ui-router.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+	
+	<script type="text/javascript" src="app.js"></script>
+	<script type="text/javascript" src="user.service.js"></script>
+	<script type="text/javascript" src="account.service.js"></script>
+	<script type="text/javascript" src="transaction.service.js"></script>
+	<script type="text/javascript" src="mockDataLoadService.js"></script>
+	<script type="text/javascript" src="customer.data.js"></script>
+	<script type="text/javascript" src="config.js"></script>
+	<script type="text/javascript" src="date.search.filter.js"></script>
+	<script type="text/javascript" src="accountViewController.js"></script>
+	<script type="text/javascript" src="addCustomerController.js"></script>
+	<script type="text/javascript" src="customerViewController.js"></script>
+	<script type="text/javascript" src="bodyController.js"></script>
+	<script type="text/javascript" src="depositController.js"></script>
+	<script type="text/javascript" src="listCustomerController.js"></script>
+	<script type="text/javascript" src="mainController.js"></script>
+	<script type="text/javascript" src="managerViewController.js"></script>
+	<script type="text/javascript" src="openAccountController.js"></script>
+	<script type="text/javascript" src="optionsController.js"></script>
+	<script type="text/javascript" src="transactionSummaryController.js"></script>
+	<script type="text/javascript" src="withdrawlController.js"></script>
+
+
+
+    </body></html>
