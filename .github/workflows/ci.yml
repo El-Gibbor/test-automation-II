@@ -78,8 +78,11 @@ jobs:
           publish_branch: gh-pages
           publish_dir: target/site/allure-maven-plugin
 
-      # Builds the whole Slack payload as one JSON value with jq rather than
-      # static YAML, since the number of "failed test" cards varies per run
+      # Builds the whole Slack payload as one JSON value with jq rather than static YAML,
+      # since the failed-test list varies per run. Uses top-level "blocks" rather than
+      # "attachments": attachments render an "Added by <app>" attribution footer on every
+      # one, which cannot be suppressed. The cost is that blocks have no colour bar, so
+      # status is carried by the header emoji instead.
       - name: Summarize test run
         if: always()
         id: summary
@@ -128,26 +131,20 @@ jobs:
           fi
 
           if [ "$JOB_STATUS" = "success" ]; then
-            status_color="#2eb67d"
             header_text="✅ CI Pipeline Passed"
           else
-            status_color="#e01e5a"
-            if [ "$total" -eq 0 ]; then
-              header_text="🔴 CI Pipeline Failed"
-            else
-              header_text="🔴 CI Pipeline Failed"
-            fi
+            header_text="🔴 CI Pipeline Failed"
           fi
 
-          # Build the failed-test cards from testng-results.xml: the @Test description (or the
-          # method name if no description is set) becomes the bold title, and the first line of
-          # the exception message, trimmed to 120 chars, becomes the one-line detail. Capped at
-          # 5 cards; any beyond that are summarised in an overflow note so the Slack message
-          # always renders in full without a "see more" cut-off.
+          # Build the failed-test list from testng-results.xml. The first line of the
+          # assertion message is used, with TestNG's trailing "expected [x] but found [y]"
+          # stripped and the result capped at 90 chars, so the bullets stay short enough
+          # that Slack renders the whole list without a "Show more" cut-off. Capped at 5
+          # entries, with any remainder summarised in an overflow note.
           overflow_note=""
           if [ -f target/surefire-reports/testng-results.xml ]; then
             failed_json=$(python3 - <<'PY'
-          import json, xml.etree.ElementTree as ET
+          import json, re, xml.etree.ElementTree as ET
           try:
               root = ET.parse("target/surefire-reports/testng-results.xml").getroot()
           except Exception:
@@ -160,7 +157,13 @@ jobs:
                   exc = m.find("exception")
                   if exc is not None:
                       msg = (exc.findtext("message") or "").strip()
-                      detail = msg.splitlines()[0][:120] if msg else (exc.get("class") or "")
+                      if msg:
+                          detail = msg.splitlines()[0]
+                          detail = re.split(r"\s*expected \[", detail)[0].strip()
+                          if len(detail) > 90:
+                              detail = detail[:87].rstrip() + "..."
+                      else:
+                          detail = exc.get("class") or ""
                   cards.append({"title": title, "detail": detail})
           print(json.dumps(cards))
           PY
@@ -176,7 +179,7 @@ jobs:
           fi
 
           payload=$(jq -n -c \
-            --arg status_color "$status_color" --arg header_text "$header_text" \
+            --arg header_text "$header_text" \
             --arg repo_name "$REPO_NAME" --arg branch "$BRANCH_NAME" \
             --arg short_sha "$short_sha" --arg subject "$subject" \
             --arg actor "$ACTOR_NAME" --arg trigger_label "$trigger_label" \
@@ -191,40 +194,34 @@ jobs:
             def mrkdwn: {type: "mrkdwn", text: .};
             def field($label; $value): ("*" + $label + "*\n" + $value) | mrkdwn;
             {
-              attachments: (
-                [{
-                  color: $status_color,
-                  blocks: [
-                    {type: "header", text: {type: "plain_text", text: $header_text, emoji: true}},
-                    {type: "section", fields: [field("Repository"; "`" + $repo_name + "`"), field("Branch"; "`" + $branch + "`")]},
-                    {type: "section", fields: [field("Commit"; "`" + $short_sha + "` " + $subject), field("Triggered by"; $actor + ", " + $trigger_label)]},
-                    {type: "divider"},
-                    {type: "section", text: (("*Results*\n🟢 " + $passed + " passed   🔴 " + $failed + " failed   ⚪ " + $skipped + " skipped   🟡 " + $retried + " retried") | mrkdwn)},
-                    {type: "context", elements: [($total + " tests total, " + $pass_rate + "% pass rate, duration " + $elapsed | mrkdwn)]}
-                  ]
-                }]
+              blocks: (
+                [
+                  {type: "header", text: {type: "plain_text", text: $header_text, emoji: true}},
+                  {type: "section", fields: [field("Repository"; "`" + $repo_name + "`"), field("Branch"; "`" + $branch + "`")]},
+                  {type: "section", fields: [field("Commit"; "`" + $short_sha + "` " + $subject), field("Triggered by"; $actor + ", " + $trigger_label)]},
+                  {type: "divider"},
+                  {type: "section", text: (("*Results*\n🟢 " + $passed + " passed   🔴 " + $failed + " failed   ⚪ " + $skipped + " skipped   🟡 " + $retried + " retried") | mrkdwn)},
+                  {type: "context", elements: [($total + " tests total, " + $pass_rate + "% pass rate, duration " + $elapsed | mrkdwn)]}
+                ]
                 + (if ($failed_tests | length) > 0 then
-                    [{
-                      color: "#e01e5a",
-                      blocks: [{
+                    [
+                      {type: "divider"},
+                      {
                         type: "section",
                         text: (("*Failed tests*\n" + ([$failed_tests[] | "• " + (if .detail != "" then .detail else .title end)] | join("\n")) + (if $overflow_note != "" then "\n_" + $overflow_note + "_" else "" end)) | mrkdwn)
-                      }]
-                    }]
-                  else [] end)
-                + [{
-                    color: $status_color,
-                    blocks: [
-                      {type: "actions", elements: [
-                        {type: "button", text: {type: "plain_text", text: "View Report", emoji: true}, style: "primary", url: $report_url},
-                        {type: "button", text: {type: "plain_text", text: "View Run", emoji: true}, url: $run_url},
-                        {type: "button", text: {type: "plain_text", text: "View Commit", emoji: true}, url: $commit_url},
-                        {type: "button", text: {type: "plain_text", text: "Create Jira Issue", emoji: true}, url: $jira_url}
-                      ]},
-                      {type: "divider"},
-                      {type: "context", elements: [("GitHub Actions · Build " + $run_number + " · Chrome headless · Java 17" | mrkdwn)]}
+                      }
                     ]
-                  }]
+                  else [] end)
+                + [
+                  {type: "actions", elements: [
+                    {type: "button", text: {type: "plain_text", text: "View Report", emoji: true}, style: "primary", url: $report_url},
+                    {type: "button", text: {type: "plain_text", text: "View Run", emoji: true}, url: $run_url},
+                    {type: "button", text: {type: "plain_text", text: "View Commit", emoji: true}, url: $commit_url},
+                    {type: "button", text: {type: "plain_text", text: "Create Jira Issue", emoji: true}, url: $jira_url}
+                  ]},
+                  {type: "divider"},
+                  {type: "section", text: (("*GitHub Actions · Build " + $run_number + " · Chrome headless · Java 17*") | mrkdwn)}
+                ]
               )
             }
             '
