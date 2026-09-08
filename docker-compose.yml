@@ -1,0 +1,10 @@
+# Convenience wrapper around the Dockerfile: `docker compose up --build` runs the whole suite
+# and leaves the Allure results on the host (./target/allure-results) for `mvn allure:serve`.
+services:
+  tests:
+    build: .
+    environment:
+      - browser=chrome
+      - headless=true
+    volumes:
+      - ./target/allure-results:/workspace/target/allure-results
