@@ -28,8 +28,6 @@ jobs:
         run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       # ubuntu-latest ships Google Chrome pre-installed; WebDriverManager matches the driver to it.
-      # Piped through tee so "Summarize test run" can pull failure detail out of the same output;
-      # GitHub Actions' default bash runs with pipefail, so a test failure still fails this step.
       - name: Run Selenium test suite (headless)
         run: mvn -B test -Dheadless=true 2>&1 | tee test-output.log
 
@@ -61,8 +59,7 @@ jobs:
             cp -r gh-pages/history/. target/allure-results/history/
           fi
 
-      # Uses the allure-maven plugin already declared in pom.xml - a plain Maven goal, no
-      # third-party Docker action required (that's what broke the previous report step).
+      # Uses the allure-maven plugin already declared in pom.xml
       - name: Generate Allure report
         if: always()
         run: mvn -B allure:report
@@ -76,11 +73,8 @@ jobs:
           publish_branch: gh-pages
           publish_dir: target/site/allure-maven-plugin
 
-      # Builds the whole Slack payload as one JSON value with jq rather than static YAML, since
-      # the number of "failed test" cards varies per run - Block Kit can't express that
-      # conditionally in a fixed template. Each failed test gets its own colored attachment
-      # (its own left-edge color bar), which is the closest real Slack can get to a card look;
-      # plain Block Kit has no per-block background fill.
+      # Builds the whole Slack payload as one JSON value with jq rather than
+      # static YAML, since the number of "failed test" cards varies per run
       - name: Summarize test run
         if: always()
         id: summary
@@ -140,10 +134,38 @@ jobs:
             fi
           fi
 
-          if [ -f test-output.log ]; then
-            failed_json=$(grep -oP '^\[ERROR\]   \K.*' test-output.log | head -5 | jq -R -s '
-              split("\n") | map(select(length > 0)) | map(capture("^(?<title>\\S+)\\s+(?<detail>.*)$"))
-            ')
+          # Build the failed-test cards from testng-results.xml: the @Test description (or the
+          # method name if no description is set) becomes the bold title, and the first line of
+          # the exception message, trimmed to 120 chars, becomes the one-line detail. Capped at
+          # 5 cards; any beyond that are summarised in an overflow note so the Slack message
+          # always renders in full without a "see more" cut-off.
+          overflow_note=""
+          if [ -f target/surefire-reports/testng-results.xml ]; then
+            failed_json=$(python3 - <<'PY'
+          import json, xml.etree.ElementTree as ET
+          try:
+              root = ET.parse("target/surefire-reports/testng-results.xml").getroot()
+          except Exception:
+              print("[]"); raise SystemExit
+          cards = []
+          for m in root.iter("test-method"):
+              if m.get("status") == "FAIL" and m.get("is-config") != "true":
+                  title = m.get("description") or m.get("name")
+                  detail = ""
+                  exc = m.find("exception")
+                  if exc is not None:
+                      msg = (exc.findtext("message") or "").strip()
+                      detail = msg.splitlines()[0][:120] if msg else (exc.get("class") or "")
+                  cards.append({"title": title, "detail": detail})
+          print(json.dumps(cards))
+          PY
+          )
+            total_failed=$(echo "$failed_json" | jq 'length')
+            shown_json=$(echo "$failed_json" | jq -c '.[:5]')
+            if [ "$total_failed" -gt 5 ]; then
+              overflow_note="and $((total_failed - 5)) more, see the full report"
+            fi
+            failed_json="$shown_json"
           else
             failed_json="[]"
           fi
@@ -158,6 +180,7 @@ jobs:
             --arg report_url "$report_url" --arg run_url "$RUN_URL" --arg commit_url "$commit_url" \
             --arg jira_url "https://amali-tech.atlassian.net/secure/CreateIssue.jspa" \
             --arg run_number "$RUN_NUMBER" \
+            --arg overflow_note "$overflow_note" \
             --argjson failed_tests "$failed_json" \
             '
             def mrkdwn: {type: "mrkdwn", text: .};
@@ -175,18 +198,21 @@ jobs:
                     {type: "section", fields: [field("Commit"; "`" + $short_sha + "` " + $subject), field("Triggered by"; $actor + ", " + $trigger_label)]},
                     {type: "divider"},
                     {type: "section", fields: [
-                      field("🟢 Passed"; $passed), field("🔴 Failed"; $failed),
-                      field("⚪ Skipped"; $skipped), field("🟡 Retried"; $retried)
+                      field("Passed"; $passed), field("Failed"; $failed),
+                      field("Skipped"; $skipped), field("Retried"; $retried)
                     ]},
                     {type: "context", elements: [($total + " tests total, " + $pass_rate + "% pass rate, duration " + $elapsed | mrkdwn)]}
                   ]
                 }]
+                + (if ($failed_tests | length) > 0 then
+                    [{color: "#e01e5a", blocks: [{type: "section", text: ("*Failed tests*" | mrkdwn)}]}]
+                  else [] end)
                 + [$failed_tests[] | {
                     color: "#e01e5a",
-                    blocks: [{type: "section", text: (("❌ *" + .title + "*\n" + .detail) | mrkdwn)}]
+                    blocks: [{type: "section", text: (("*" + .title + "*") | mrkdwn)}]
                   }]
-                + (if ($failed_tests | length) > 0 then
-                    [{color: "#ecb22e", blocks: [{type: "section", text: ("⚠️ *QA action*\nReview the failing tests before approving this change." | mrkdwn)}]}]
+                + (if $overflow_note != "" then
+                    [{color: "#e01e5a", blocks: [{type: "context", elements: [($overflow_note | mrkdwn)]}]}]
                   else [] end)
                 + [{
                     color: $status_color,
