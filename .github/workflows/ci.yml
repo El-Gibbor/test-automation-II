@@ -28,8 +28,13 @@ jobs:
         run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       # ubuntu-latest ships Google Chrome pre-installed; WebDriverManager matches the driver to it.
+      # set -o pipefail is required here: without it, "mvn ... | tee" always exits 0 (tee's own
+      # exit code), which would report this step - and the whole job - as successful even when
+      # tests fail, silently breaking job.status for the Slack notification below.
       - name: Run Selenium test suite (headless)
-        run: mvn -B test -Dheadless=true 2>&1 | tee test-output.log
+        run: |
+          set -o pipefail
+          mvn -B test -Dheadless=true 2>&1 | tee test-output.log
 
       # Always upload raw results as a build artifact - the reliable path for grading/review,
       # independent of whether GitHub Pages is enabled on this repo.
