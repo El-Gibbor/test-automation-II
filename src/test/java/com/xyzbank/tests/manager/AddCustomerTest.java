@@ -32,7 +32,7 @@ public class AddCustomerTest extends BaseTest {
     @Test(description = "Manager can add a new customer with a valid, alphabetic name and numeric postal code",
             groups = {"manager", "smoke"}
 )
-    @Story("Add Customer")
+    @Story("Adding Customers")
     @Severity(SeverityLevel.CRITICAL)
     @Description("A bank manager adds a customer with valid data; the customer is confirmed and appears in the Customers list.")
     public void shouldAddCustomerSuccessfully() {
@@ -55,7 +55,7 @@ public class AddCustomerTest extends BaseTest {
             dataProviderClass = DataProviders.class, dataProvider = "invalidCustomers",
             groups = {"manager", "regression"}
 )
-    @Story("Add Customer - Input Validation")
+    @Story("Adding Customers - Input Validation")
     @Severity(SeverityLevel.NORMAL)
     @Issue(JiraLinks.DEFECT_ADD_CUSTOMER_VALIDATION)
     @Description("Names must be alphabetic-only and postal codes numeric-only per the acceptance criteria; "
@@ -72,7 +72,7 @@ public class AddCustomerTest extends BaseTest {
 
     @Test(description = "The Customers list search filters to only the matching customer",
             groups = {"manager", "regression"})
-    @Story("Add Customer - Customer List Search")
+    @Story("Adding Customers - Customer List Search")
     @Severity(SeverityLevel.NORMAL)
     @Description("Searching by a newly added customer's name filters the list down to that one row, "
             + "and searching a term that matches nobody returns no rows."
@@ -92,8 +92,9 @@ public class AddCustomerTest extends BaseTest {
         Assert.assertEquals(customersList.rowCount(), 0, "A search matching nobody should return no rows");
     }
 
-    @Test(description = "An oversized but otherwise valid name is still accepted and listed correctly")
-    @Story("Add Customer - Boundary Input")
+    @Test(description = "An oversized but otherwise valid name is still accepted and listed correctly",
+            groups = {"manager", "regression"})
+    @Story("Adding Customers - Boundary Input")
     @Severity(SeverityLevel.MINOR)
     @Description("The acceptance criteria set no length limit on names; this pins the actual behavior "
             + "for an unusually long (but alphabetic) name so any future truncation is caught as a regression."
@@ -112,7 +113,7 @@ public class AddCustomerTest extends BaseTest {
 
     @Test(description = "Submitting the same customer twice is rejected as a duplicate",
             groups = {"manager", "regression"})
-    @Story("Add Customer - Duplicate Handling")
+    @Story("Adding Customers - Duplicate Handling")
     @Severity(SeverityLevel.NORMAL)
     @Description("The acceptance criteria do not explicitly cover duplicates, but the live app flags a "
             + "second submission of identical customer data and does not create a second record."
