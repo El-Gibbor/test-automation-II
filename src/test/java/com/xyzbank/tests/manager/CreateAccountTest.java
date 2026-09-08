@@ -29,7 +29,7 @@ public class CreateAccountTest extends BaseTest {
 
     @Test(description = "Manager can open an account for a customer that has already been added",
             groups = {"manager", "smoke"})
-    @Story("Create Account")
+    @Story("Creating Accounts")
     @Severity(SeverityLevel.CRITICAL)
     @Description("Opening an account for an existing customer succeeds and returns a usable account number.")
     public void shouldCreateAccountForExistingCustomer() {
@@ -45,7 +45,7 @@ public class CreateAccountTest extends BaseTest {
 
     @Test(description = "A customer with no account yet cannot access account features",
             groups = {"manager", "customer", "regression"})
-    @Story("Create Account - Access Control")
+    @Story("Creating Accounts - Access Control")
     @Severity(SeverityLevel.CRITICAL)
     @Description("Per the acceptance criteria, customers must not access their account until a manager has created one.")
     public void shouldBlockCustomerAccessBeforeAccountIsCreated() {
