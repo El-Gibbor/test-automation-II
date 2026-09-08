@@ -1,6 +1,7 @@
 package com.xyzbank.tests.manager;
 
 import com.xyzbank.base.BaseTest;
+import com.xyzbank.jira.JiraLinks;
 import com.xyzbank.models.Customer;
 import com.xyzbank.pages.CustomersListPage;
 import com.xyzbank.pages.ManagerDashboardPage;
@@ -8,6 +9,7 @@ import com.xyzbank.utils.TestDataFactory;
 import io.qameta.allure.Description;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
+import io.qameta.allure.Link;
 import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
 import io.qameta.allure.Story;
@@ -18,6 +20,8 @@ import org.testng.annotations.Test;
 /** User Story 1 - Delete Account acceptance criteria. */
 @Epic("XYZ Bank")
 @Feature("Manager - Customer Management")
+@Link(name = "User Story 1", url = JiraLinks.USER_STORY_1)
+@Link(name = "Xray Test Set", url = JiraLinks.MANAGER_TEST_SET)
 public class DeleteAccountTest extends BaseTest {
 
     @Test(description = "Deleting a customer removes them from the Customers list and revokes account access",

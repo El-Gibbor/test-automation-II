@@ -1,6 +1,7 @@
 package com.xyzbank.tests.manager;
 
 import com.xyzbank.base.BaseTest;
+import com.xyzbank.jira.JiraLinks;
 import com.xyzbank.models.Customer;
 import com.xyzbank.pages.AccountPage;
 import com.xyzbank.pages.ManagerDashboardPage;
@@ -9,6 +10,7 @@ import com.xyzbank.utils.TestDataFactory;
 import io.qameta.allure.Description;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
+import io.qameta.allure.Link;
 import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
 import io.qameta.allure.Step;
@@ -21,6 +23,8 @@ import java.util.Optional;
 /** User Story 1 - Create Account acceptance criteria. */
 @Epic("XYZ Bank")
 @Feature("Manager - Customer Management")
+@Link(name = "User Story 1", url = JiraLinks.USER_STORY_1)
+@Link(name = "Xray Test Set", url = JiraLinks.MANAGER_TEST_SET)
 public class CreateAccountTest extends BaseTest {
 
     @Test(description = "Manager can open an account for a customer that has already been added",
