@@ -19,5 +19,26 @@
     "postalCode": "AB123",
     "description": "Postal code containing letters must be rejected (acceptance criteria: numeric only)",
     "expectedError": "Postal code must contain only numeric characters"
+  },
+  {
+    "firstName": "",
+    "lastName": "Doe",
+    "postalCode": "56789",
+    "description": "Blank first name must be rejected",
+    "expectedError": "First name must not be blank"
+  },
+  {
+    "firstName": "Jane",
+    "lastName": "",
+    "postalCode": "56789",
+    "description": "Blank last name must be rejected",
+    "expectedError": "Last name must not be blank"
+  },
+  {
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "postalCode": "",
+    "description": "Blank postal code must be rejected",
+    "expectedError": "Postal code must not be blank"
   }
 ]

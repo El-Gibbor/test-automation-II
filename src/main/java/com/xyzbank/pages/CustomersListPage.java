@@ -28,6 +28,12 @@ public class CustomersListPage extends BasePage {
                 .anyMatch(row -> row.getText().contains(firstName) && row.getText().contains(lastName));
     }
 
+    /** Number of rows currently shown, i.e. after any {@link #search(String)} filtering has applied. */
+    @Step("Count visible customer rows")
+    public int rowCount() {
+        return findAll(TABLE_ROWS).size();
+    }
+
     @Step("Delete customer '{firstName} {lastName}'")
     public void deleteCustomer(String firstName, String lastName) {
         WebElement row = findAll(TABLE_ROWS).stream()
