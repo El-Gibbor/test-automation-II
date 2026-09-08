@@ -2,7 +2,9 @@ package com.xyzbank.pages;
 
 import io.qameta.allure.Step;
 import org.openqa.selenium.By;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 
 /** Read-only transaction history for the selected account. */
 public class TransactionsPage extends BasePage {
@@ -16,8 +18,18 @@ public class TransactionsPage extends BasePage {
         super(driver);
     }
 
+    /**
+     * Counts the rows currently rendered. Waits briefly for the first row to appear so a call
+     * right after navigating here doesn't race Angular's render; a genuinely empty history just
+     * lets the wait time out and falls through to the real (zero) count below.
+     */
     @Step("Count transactions listed")
     public int getTransactionCount() {
+        try {
+            wait.until(ExpectedConditions.presenceOfElementLocated(TRANSACTION_ROWS));
+        } catch (TimeoutException noRowsRendered) {
+            // fall through - an empty transaction history is a valid outcome, not a failure
+        }
         return findAll(TRANSACTION_ROWS).size();
     }
 
