@@ -139,9 +139,8 @@ jobs:
           # Build the failed-test list from testng-results.xml. The first line of the
           # assertion message is used, with TestNG's trailing "expected [x] but found [y]"
           # stripped and the result capped at 90 chars, so the bullets stay short enough
-          # that Slack renders the whole list without a "Show more" cut-off. Capped at 5
-          # entries, with any remainder summarised in an overflow note.
-          overflow_note=""
+          # that Slack renders the whole list without a "Show more" cut-off. Every failure
+          # is listed; the View Report button covers the full detail.
           if [ -f target/surefire-reports/testng-results.xml ]; then
             failed_json=$(python3 - <<'PY'
           import json, re, xml.etree.ElementTree as ET
@@ -168,12 +167,6 @@ jobs:
           print(json.dumps(cards))
           PY
           )
-            total_failed=$(echo "$failed_json" | jq 'length')
-            shown_json=$(echo "$failed_json" | jq -c '.[:5]')
-            if [ "$total_failed" -gt 5 ]; then
-              overflow_note="and $((total_failed - 5)) more, see the full report"
-            fi
-            failed_json="$shown_json"
           else
             failed_json="[]"
           fi
@@ -188,7 +181,6 @@ jobs:
             --arg report_url "$report_url" --arg run_url "$RUN_URL" --arg commit_url "$commit_url" \
             --arg jira_url "https://amali-tech.atlassian.net/secure/CreateIssue.jspa" \
             --arg run_number "$RUN_NUMBER" \
-            --arg overflow_note "$overflow_note" \
             --argjson failed_tests "$failed_json" \
             '
             def mrkdwn: {type: "mrkdwn", text: .};
@@ -208,7 +200,7 @@ jobs:
                       {type: "divider"},
                       {
                         type: "section",
-                        text: (("*Failed tests*\n" + ([$failed_tests[] | "• " + (if .detail != "" then .detail else .title end)] | join("\n")) + (if $overflow_note != "" then "\n_" + $overflow_note + "_" else "" end)) | mrkdwn)
+                        text: (("*Failed tests*\n" + ([$failed_tests[] | "• " + (if .detail != "" then .detail else .title end)] | join("\n"))) | mrkdwn)
                       }
                     ]
                   else [] end)
