@@ -1,6 +1,8 @@
 [
-  { "amount": 50,        "expectedValid": true,  "description": "Valid withdrawal within available balance" },
-  { "amount": 0,         "expectedValid": false, "description": "Zero amount must be rejected" },
-  { "amount": -50,       "expectedValid": false, "description": "Negative amount must be rejected" },
-  { "amount": 999999999, "expectedValid": false, "description": "Withdrawal exceeding balance must be rejected" }
+  { "amount": 50,         "expectedValid": true,  "description": "Valid withdrawal within available balance" },
+  { "amount": 12.5,       "expectedValid": true,  "description": "Valid decimal withdrawal (currently blocked: amount input has no step=any, so 12.5 fails native stepMismatch validation)" },
+  { "amount": 0,          "expectedValid": false, "description": "Zero amount must be rejected" },
+  { "amount": -50,        "expectedValid": false, "description": "Negative amount must be rejected" },
+  { "amount": 999999999,  "expectedValid": false, "description": "Withdrawal exceeding balance must be rejected" },
+  { "amount": 0, "rawInput": "abc", "expectedValid": false, "description": "Non-numeric withdrawal amount must be rejected" }
 ]

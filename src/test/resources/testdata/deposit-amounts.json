@@ -1,5 +1,7 @@
 [
-  { "amount": 500,  "expectedValid": true,  "description": "Valid positive deposit amount" },
-  { "amount": 0,    "expectedValid": false, "description": "Zero amount must be rejected" },
-  { "amount": -100, "expectedValid": false, "description": "Negative amount must be rejected" }
+  { "amount": 500,   "expectedValid": true,  "description": "Valid positive deposit amount" },
+  { "amount": 12.5,  "expectedValid": true,  "description": "Valid decimal deposit amount (currently blocked: amount input has no step=any, so 12.5 fails native stepMismatch validation)" },
+  { "amount": 0,     "expectedValid": false, "description": "Zero amount must be rejected" },
+  { "amount": -100,  "expectedValid": false, "description": "Negative amount must be rejected" },
+  { "amount": 0, "rawInput": "abc", "expectedValid": false, "description": "Non-numeric deposit amount must be rejected" }
 ]
