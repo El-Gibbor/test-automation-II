@@ -25,6 +25,9 @@ public class AllureEnvironmentWriter implements ISuiteListener {
         env.setProperty("Base.URL", ConfigReader.baseUrl());
         env.setProperty("OS", System.getProperty("os.name"));
         env.setProperty("Java.Version", System.getProperty("java.version"));
+        env.setProperty("Build.Number", buildNumber());
+        env.setProperty("Build.Commit", commitSha());
+        env.setProperty("Build.URL", buildUrl());
 
         Path resultsDir = Path.of("target", "allure-results");
         try {
@@ -36,5 +39,29 @@ public class AllureEnvironmentWriter implements ISuiteListener {
             // reporting metadata only - never fail the build over this
             System.err.println("Could not write Allure environment.properties: " + e.getMessage());
         }
+    }
+
+    /**
+     * GitHub Actions sets GITHUB_RUN_NUMBER/GITHUB_SHA/etc.; a local run has none of these, so
+     * the report just says "local" instead of leaving the field blank or throwing.
+     */
+    private String buildNumber() {
+        String runNumber = System.getenv("GITHUB_RUN_NUMBER");
+        return runNumber != null ? "#" + runNumber : "local";
+    }
+
+    private String commitSha() {
+        String sha = System.getenv("GITHUB_SHA");
+        return sha != null ? sha.substring(0, Math.min(7, sha.length())) : "local";
+    }
+
+    private String buildUrl() {
+        String serverUrl = System.getenv("GITHUB_SERVER_URL");
+        String repository = System.getenv("GITHUB_REPOSITORY");
+        String runId = System.getenv("GITHUB_RUN_ID");
+        if (serverUrl == null || repository == null || runId == null) {
+            return "local";
+        }
+        return serverUrl + "/" + repository + "/actions/runs/" + runId;
     }
 }
