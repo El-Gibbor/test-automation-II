@@ -1,5 +1,6 @@
 package com.xyzbank.pages;
 
+import com.xyzbank.base.BasePage;
 import com.xyzbank.utils.ConfigReader;
 import io.qameta.allure.Step;
 import org.openqa.selenium.By;
