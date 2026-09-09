@@ -133,7 +133,7 @@ jobs:
           if [ "$JOB_STATUS" = "success" ]; then
             header_text="✅ CI Pipeline Passed"
           else
-            header_text="🔴 CI Pipeline Failed"
+            header_text="❌ CI Pipeline Failed"
           fi
 
           # Build the failed-test list from testng-results.xml. The first line of the
